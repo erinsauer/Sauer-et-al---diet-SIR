@@ -47,22 +47,25 @@ SIR <- function(time, current_state, params){
 ############### model running ################################
 times <- 0:100
 
-params.protein <- c(beta=beta.protein, a=a, delta=delta, lamda=lamda, psi=psi, nu=nu,
+params.protein <- c(beta=beta.protein, a=a, delta=delta, 
+                    lamda=lamda, psi=psi, nu=nu,
                     gamma=gamma.protein, mu=mu.protein)
-params.lipid <- c(beta=beta.lipid, a=a, delta=delta, lamda=lamda, psi=psi, nu=nu,
+
+params.lipid <- c(beta=beta.lipid, a=a, delta=delta, 
+                  lamda=lamda, psi=psi, nu=nu,
                   gamma=gamma.lipid, mu=mu.lipid)
 
-S=100; I1=1; R1=0; I2=0; R2=0
+S=99; I1=1; R1=0; I2=0; R2=0
 
 initial_state <- c(S=S, I1=I1, R1=R1, I2=I2, R2=R2)
 model.lipid <- ode(initial_state, times, SIR, params.lipid)
 summary(model.lipid)
 
-initial_state <- c(S=S, I1=I1, R1=R1, I2=I2, R2=)
+initial_state <- c(S=S, I1=I1, R1=R1, I2=I2, R2=R2)
 model.protein <- ode(initial_state, times, SIR, params.protein)
 summary(model.protein)
 
-######### plotting  #####
+######### plotting  ##########
 #cumulative infection & total population size
 
 model.protein <- as.data.frame(model.protein)
@@ -77,7 +80,7 @@ models <- models %>% group_by(time) %>%
   mutate(total.birds = S+R1+R2+I1+I2)
 models <- models %>% group_by(time) %>% mutate(I.Prop = (I.total/total.birds))
 
-#population size
+#population size plot
 PopSize <- ggplot(models, aes(x = time, y = total.birds)) + 
   geom_line(aes(color = diet)) +
   theme_bw()+
@@ -88,8 +91,10 @@ PopSize <- ggplot(models, aes(x = time, y = total.birds)) +
         legend.text= element_text(size=20),
         legend.title= element_blank()
   )+
+  scale_colour_grey()+
   ylab("Population size") + xlab("Days")
-#proportion infected
+
+#proportion infected plot
 PInf <- ggplot(models, aes(x = time, y = I.Prop)) + 
   geom_line(aes(color = diet)) +
   theme_bw()+
@@ -100,7 +105,68 @@ PInf <- ggplot(models, aes(x = time, y = I.Prop)) +
         legend.text= element_text(size=20),
         legend.title= element_blank()
   )+
+  scale_colour_grey()+
   ylab("Proportion infected") + xlab("Days")
 
+#print Figure 2 panel
 ggarrange(PopSize, PInf, ncol=2, nrow=1, labels=c("A","B"),
+          font.label = list(size=20,face="bold"))
+
+########## beta.lipid sensitivity analysis ################
+# beta 
+B.list <- c(0.004125,0.0055, 0.006875)
+modeln <- list()
+models.B <- data.frame()
+
+for(i in 1:3){
+  B = B.list[i]
+  params <- c(beta=B, a=a, delta=delta, lamda=lamda, psi=psi, nu=nu,
+                    gamma=gamma.lipid, mu=mu.lipid)
+  initial_state <- c(S=99, I1=1, R1=0, I2=0, R2=0)
+  model <- ode(initial_state, times, SIR, params)
+  summary(model)
+  model <- as.data.frame(model)
+  model <- model %>% group_by(time) %>% mutate(I.total = I1 + I2)
+  model <- model %>% group_by(time) %>% 
+    mutate(total.birds = S+R1+R2+I1+I2)
+  model <- model %>% group_by(time) %>% mutate(I.Prop = (I.total/total.birds))
+  model$B <- B
+  modeln[[i]] <- model
+  models.B <- rbind(models.B, model)
+}
+
+View(models.B)
+write.csv(models.B, "Supplemental Dataset_beta lipid sensitivity analsysis.csv")
+
+str(models.B)
+models.B$B <- as.factor(models.B$B)
+
+PopSizeB <- ggplot(models.B, aes(x = time, y = total.birds)) + 
+  geom_line(aes(color = B)) +
+  theme_bw()+
+  theme(axis.text=element_text(size=20, color="black"),
+        panel.border = element_blank(),
+        axis.title=element_text(size=20),
+        legend.position=c(0.8,0.9),
+        legend.text= element_text(size=20),
+        legend.title= element_blank()
+  )+
+  scale_colour_grey()+
+  ylab("Population size") + xlab("Days")
+
+#proportion infected
+PInfB <- ggplot(models.B, aes(x = time, y = I.Prop)) + 
+  geom_line(aes(color = B)) +
+  theme_bw()+
+  theme(axis.text=element_text(size=20, color="black"),
+        panel.border = element_blank(),
+        axis.title=element_text(size=20),
+        legend.position=c(0.8,0.9),
+        legend.text= element_text(size=20),
+        legend.title= element_blank()
+  )+
+  scale_colour_grey()+
+  ylab("Proportion infected") + xlab("Days")
+
+ggarrange(PopSizeB, PInfB, ncol=2, nrow=1, labels=c("A","B"),
           font.label = list(size=20,face="bold"))
